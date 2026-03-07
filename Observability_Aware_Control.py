@@ -294,3 +294,24 @@ with open('gamma_data_no_probe.csv', 'w', newline='') as myfile:
     writer.writerow(['x_value', 'y_value']) # Write header
     for i in range(len(t)):
         writer.writerow([t[i], x[i, 3]]) # Write data rows
+
+sensor_levels = np.linspace(1.0, 0.2, 25)
+L_test = []
+
+for s in sensor_levels:
+
+    beta_measured_test = beta * s
+    
+    G = compute_G(Ip, li, beta_measured_test, c_nom)
+    cond = np.linalg.cond(G)
+    
+    L = np.log(1 + cond)
+    L_test.append(L)
+
+plt.figure()
+plt.plot(sensor_levels, L_test)
+plt.xlabel("Sensor quality")
+plt.ylabel("Observability loss L_obs")
+plt.title("Observability metric sensitivity to diagnostic degradation")
+plt.gca().invert_xaxis()
+plt.show()
