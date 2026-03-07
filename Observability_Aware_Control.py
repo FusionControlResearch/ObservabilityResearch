@@ -179,13 +179,14 @@ for k in range(T-1):
         healthy_idx = np.arange(30, 40)
         mu_healthy    = np.mean(L_obs[healthy_idx])
         sigma_healthy = np.std(L_obs[healthy_idx])
+        L_high_nom = mu_healthy * sigma_healthy
     
     if k >= 40:
         L_obs_nom[k] = (L_obs[k] - mu_healthy) / sigma_healthy
 
 
 
-    '''if (mag_trigger or rate_trigger or rank_trigger) and certified is True:
+    if (mag_trigger or rate_trigger or rank_trigger) and certified is True:
         probe = True
         probing[k] = 1.0
         c_eff = c_nom
@@ -199,27 +200,18 @@ for k in range(T-1):
         u[k, 1] = 0.0
         u_k = 1.0
         probe_amp = 1.0
-        z = z - z / tau'''
-    #if (mag_trigger or rate_trigger or rank_trigger) and certified is True:
-    #    correction = True
-    probe = False
-    u[k, 1] = 0.0
-    u_k = 1.0
-    probe_amp = 1.0
-    z = z - z / tau
-    probing[k] = 0.0
+        z = z - z / tau
+
+    #probe = False
+    #u[k, 1] = 0.0
+    #u_k = 1.0
+    #probe_amp = 1.0
+    # = z - z / tau
+    #probing[k] = 0.0
 
     Ip_next = Ip + (a*u[k,1] - 0.12*Ip)
     li_next = li + (c_eff*u[k,1] - d*li)
     beta_next = beta_measured + (e*u[k,1] - 0.08*beta_measured)
-
-    #if correction == True:
-    #if probing[k] == 1.0:
-        # corrective nudge toward nominal manifold
-        #Ip_next += -k_Ip * (Ip_next - Ip_nominal)
-        #beta_next += -k_beta * (beta_next - beta_nominal)
-        #li_next += -k_li * (li_next - li_nominal)
-
     
     if warmup is True or certified is False:
         gamma_dot = 0.0
@@ -259,7 +251,7 @@ plt.plot(t, L_obs_nom)
 plt.ylabel("Nominal Observability loss L_obs_nom")
 plt.xlabel("time")
 plt.title("Nominal Observability collapse and recovery")
-plt.axhline(y=L_high, color='green', linestyle='-')
+plt.axhline(y=L_high_nom, color='green', linestyle='-')
 plt.show()
 
 with open('L_obs_nom_data_no_probe.csv', 'w', newline='') as myfile:
