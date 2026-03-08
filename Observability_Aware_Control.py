@@ -36,7 +36,7 @@ u[:, 0] = 1.0      # loop voltage
 u[:, 1] = 1.0      # heating
 
 # Parameters
-a, c_nom, d, e, f = 0.8, 0.3, 0.2, 0.5, 0.3
+a, c_nom, d, e = 0.8, 0.3, 0.2, 0.5
 alpha1, alpha2, alpha3, alpha4 = 1.0, 0.5, 0.25, 0.15
 
 # Tracking
@@ -61,20 +61,11 @@ rank_trigger = False
 correction = False
 
 # Observability matrix
-#def compute_G(Ip, li, beta, c_eff):
-#    return np.array([
-#        [alpha1*a + alpha2*c_eff,   -alpha2*d],
-#        [alpha3*beta*a,             alpha3*e*Ip],
-#        [alpha4*beta*a,                       alpha4*f*li]
-#    ])
 def compute_G(Ip, li, beta, c_eff):
-
     return np.array([
-        [alpha1*a + alpha2*c_eff,    -alpha2*d],
-
-        [alpha3*beta*a,              alpha3*e*Ip],
-
-        [alpha4*beta*a,              alpha4*f*li]
+        [alpha1*a + alpha2*c_eff,   -alpha2*d],
+        [alpha3*beta*a,             alpha3*e*Ip],
+        [alpha4*beta*a,                       alpha4*beta*a]
     ])
 
 
@@ -96,19 +87,19 @@ z = 0.0
 tau = 20.0   # recovery time constant (steps)
 
 #W = 30
-T_warmup = 50  # timesteps
+T_warmup = 30  # timesteps
 warmup = True
 certified = False
 
-#n_sigma = 3.1
-n_sigma = 1.2
+n_sigma = 3.1
+
 
 for k in range(T-1):
 
     Ip, li, beta, gamma, gamma_dot, obs_integrator = x[k]
 
     # Degradation window
-    degraded = (80 < k < 110)
+    degraded = (40 < k < 70)
 
     # Loss of actuator coupling
     if degraded:
@@ -118,17 +109,14 @@ for k in range(T-1):
 
     # Pressure erosion
     if degraded:
-        #beta_measured = beta - 0.015
-        beta_measured = beta * 0.6
+        beta_measured = beta - 0.015
     else:
         beta_measured = beta
 
 
     # Observability metric
     G_eff = compute_G(Ip, li, beta_measured, c_eff)
-    #L_obs[k] = np.log(1 + np.linalg.cond(G_eff))
-    L_obs[k] = np.log(1 + np.linalg.cond(G_eff.T @ G_eff))
-    P_k = np.linalg.inv(G_eff.T @ G_eff + (1e-8)*np.eye(G_eff.shape[1]))
+    L_obs[k] = np.log(1 + np.linalg.cond(G_eff))
 
 
     # --- ESTIMATOR CONFIDENCE UPDATE (Layer B) ---
@@ -141,7 +129,7 @@ for k in range(T-1):
     if k < T_warmup:
         certified = False
         probe = False
-        P_history.append(P_k)
+        P_history.append(P_norm)
         s = np.linalg.svd(G_eff, compute_uv=False)
         #L_buffer.append(L_obs)
         li_buffer.append(li)
@@ -162,7 +150,7 @@ for k in range(T-1):
         #L_low  = L_ref + m_sigma * L_std
 
     if warmup is False:
-        if P_norm < 1.2 * P_nominal: #and (abs(u_k - 1.0) < 0.6 * u_max):
+        if P_norm < 1.2 * P_nominal and (abs(u_k - 1.0) < 0.6 * u_max):
             if certified is False:
                 certified = True
                 P_nominal = np.mean(P_history[:T_warmup])
@@ -186,14 +174,14 @@ for k in range(T-1):
         rank_trigger = rho < (rho_mean - 3*rho_std)
 
     
-    if k == 50:
+    if k == 40:
         # healthy indices: after warm-up, before degradation
-        healthy_idx = np.arange(50, 60)
-        mu_healthy    = np.mean(L_obs[50:61])
-        sigma_healthy = np.std(L_obs[50:61])
-        L_high_nom = mu_healthy + n_sigma * sigma_healthy
+        healthy_idx = np.arange(30, 40)
+        mu_healthy    = np.mean(L_obs[healthy_idx])
+        sigma_healthy = np.std(L_obs[healthy_idx])
+        L_high_nom = mu_healthy * sigma_healthy
     
-    if k >= 50:
+    if k >= 40:
         L_obs_nom[k] = (L_obs[k] - mu_healthy) / sigma_healthy
 
 
@@ -213,20 +201,17 @@ for k in range(T-1):
         u_k = 1.0
         probe_amp = 1.0
         z = z - z / tau
-    '''probe = False
-    u[k, 1] = 0.0
-    u_k = 1.0
-    probe_amp = 1.0
-    z = z - z / tau
-    probing[k] = 0.0'''
+
+    #probe = False
+    #u[k, 1] = 0.0
+    #u_k = 1.0
+    #probe_amp = 1.0
+    # = z - z / tau
+    #probing[k] = 0.0
 
     Ip_next = Ip + (a*u[k,1] - 0.12*Ip)
     li_next = li + (c_eff*u[k,1] - d*li)
-    #beta_next = beta_measured + (e*u[k,1] - 0.08*beta_measured)
-    beta_eq = 2.0
-    k_beta = 0.08
-
-    beta_next = beta + (e*u[k,1] - k_beta*(beta - beta_eq))
+    beta_next = beta_measured + (e*u[k,1] - 0.08*beta_measured)
     
     if warmup is True or certified is False:
         gamma_dot = 0.0
@@ -266,7 +251,7 @@ plt.plot(t, L_obs_nom)
 plt.ylabel("Nominal Observability loss L_obs_nom")
 plt.xlabel("time")
 plt.title("Nominal Observability collapse and recovery")
-plt.axhline(y=L_high, color='green', linestyle='-')
+plt.axhline(y=L_high_nom, color='green', linestyle='-')
 plt.show()
 
 with open('L_obs_nom_data_no_probe.csv', 'w', newline='') as myfile:
