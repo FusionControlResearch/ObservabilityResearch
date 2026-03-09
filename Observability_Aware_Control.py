@@ -36,7 +36,7 @@ u[:, 0] = 1.0      # loop voltage
 u[:, 1] = 1.0      # heating
 
 # Parameters
-a, c_nom, d, e = 0.8, 0.3, 0.2, 0.5
+a, c_nom, d, e, f = 0.8, 0.3, 0.2, 0.5, 0.3
 alpha1, alpha2, alpha3, alpha4 = 1.0, 0.5, 0.25, 0.15
 
 # Tracking
@@ -65,7 +65,7 @@ def compute_G(Ip, li, beta, c_eff):
     return np.array([
         [alpha1*a + alpha2*c_eff,   -alpha2*d],
         [alpha3*beta*a,             alpha3*e*Ip],
-        [alpha4*beta*a,                       alpha4*beta*a]
+        [alpha4*beta*a,                       alpha4*f*li]
     ])
 
 
@@ -87,7 +87,7 @@ z = 0.0
 tau = 20.0   # recovery time constant (steps)
 
 #W = 30
-T_warmup = 30  # timesteps
+T_warmup = 50  # timesteps
 warmup = True
 certified = False
 
@@ -99,7 +99,7 @@ for k in range(T-1):
     Ip, li, beta, gamma, gamma_dot, obs_integrator = x[k]
 
     # Degradation window
-    degraded = (40 < k < 70)
+    degraded = (80 < k < 120)
 
     # Loss of actuator coupling
     if degraded:
@@ -109,7 +109,7 @@ for k in range(T-1):
 
     # Pressure erosion
     if degraded:
-        beta_measured = beta - 0.015
+        beta_measured = beta * 0.1
     else:
         beta_measured = beta
 
@@ -121,7 +121,7 @@ for k in range(T-1):
 
     # --- ESTIMATOR CONFIDENCE UPDATE (Layer B) ---
     # P inflates when observability degrades
-    P = P + beta_measured * L_obs[k] * np.eye(n)
+    P = beta_measured * L_obs[k] * np.eye(n)
     # Frobenius norm (used for certification only)
     P_norm = np.linalg.norm(P, ord='fro')
 
@@ -147,16 +147,20 @@ for k in range(T-1):
         L_ref = np.mean(L_obs[:T_warmup])
         L_std = np.std(L_obs[:T_warmup])
         L_high = L_ref + n_sigma * L_std
+        #L_high = 1.0 + (3*(L_std/L_nominal))
         #L_low  = L_ref + m_sigma * L_std
 
     if warmup is False:
-        if P_norm < 1.2 * P_nominal and (abs(u_k - 1.0) < 0.6 * u_max):
+        if P_norm < 1.2 * P_nominal: #and (abs(u_k - 1.0) < 0.6 * u_max):
             if certified is False:
                 certified = True
                 P_nominal = np.mean(P_history[:T_warmup])
-                L_nominal = np.mean(L_obs[k-1:k])
-                L_std     = np.std(L_obs[k-1:k])
-                L_tilde_nominal = L_obs[k-1:k] / L_nominal
+                #L_nominal = np.mean(L_obs[k-1:k])
+                #L_std     = np.std(L_obs[k-1:k])
+                #L_tilde_nominal = L_obs[k-1:k] / L_nominal
+                L_nominal = np.mean(L_obs[:T_warmup])
+                L_std     = np.std(L_obs[:T_warmup])
+                L_tilde_nominal = L_obs[:T_warmup] / L_nominal
                 dL_nominal = np.diff(L_tilde_nominal) / (k - (k-1))
                 dL_std = np.std(dL_nominal)
                 rho_mean   = np.mean(rho_buffer)
@@ -167,21 +171,24 @@ for k in range(T-1):
         L_tilde_prev = L_tilde
         L_tilde = L_obs[k] / L_nominal
         dL = (L_tilde - L_tilde_prev) / (k - (k-1))
-        mag_trigger = L_tilde > 1 + 3*(L_std/L_nominal)
+        mag_trigger = L_tilde > L_high #1.0 + (3*(L_std/L_nominal))
+        print(L_tilde)
+        print(L_obs[k])
+        print(1 + (3*(L_std/L_nominal)))
         rate_trigger = abs(dL) > 3*dL_std
         s = np.linalg.svd(G_eff, compute_uv=False)
         rho = s[-1] / s[0]
         rank_trigger = rho < (rho_mean - 3*rho_std)
 
     
-    if k == 40:
+    if k == 60:
         # healthy indices: after warm-up, before degradation
-        healthy_idx = np.arange(30, 40)
+        healthy_idx = np.arange(50, 60)
         mu_healthy    = np.mean(L_obs[healthy_idx])
         sigma_healthy = np.std(L_obs[healthy_idx])
-        L_high_nom = mu_healthy * sigma_healthy
+        L_high_nom = mu_healthy + n_sigma * sigma_healthy
     
-    if k >= 40:
+    if k >= 60:
         L_obs_nom[k] = (L_obs[k] - mu_healthy) / sigma_healthy
 
 
@@ -206,12 +213,15 @@ for k in range(T-1):
     #u[k, 1] = 0.0
     #u_k = 1.0
     #probe_amp = 1.0
-    # = z - z / tau
+    #z = z - z / tau
     #probing[k] = 0.0
 
     Ip_next = Ip + (a*u[k,1] - 0.12*Ip)
     li_next = li + (c_eff*u[k,1] - d*li)
-    beta_next = beta_measured + (e*u[k,1] - 0.08*beta_measured)
+    beta_eq = 2.0
+    k_beta = 0.08
+
+    beta_next = beta + (e*u[k,1] - k_beta*(beta - beta_eq))
     
     if warmup is True or certified is False:
         gamma_dot = 0.0
