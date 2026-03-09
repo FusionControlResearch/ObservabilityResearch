@@ -161,7 +161,7 @@ for k in range(T-1):
                 L_nominal = np.mean(L_obs[:T_warmup])
                 L_std     = np.std(L_obs[:T_warmup])
                 L_tilde_nominal = L_obs[:T_warmup] / L_nominal
-                dL_nominal = np.diff(L_tilde_nominal) / (k - (k-1))
+                dL_nominal = np.diff(L_tilde_nominal) / T_warmup#(k - (k-1))
                 dL_std = np.std(dL_nominal)
                 rho_mean   = np.mean(rho_buffer)
                 rho_std    = np.std(rho_buffer)
@@ -171,7 +171,7 @@ for k in range(T-1):
         L_tilde_prev = L_tilde
         L_tilde = L_obs[k] / L_nominal
         dL = (L_tilde - L_tilde_prev) / (k - (k-1))
-        mag_trigger = L_tilde > L_high #1.0 + (3*(L_std/L_nominal))
+        mag_trigger = L_tilde > 1.0 + (3*(L_std/L_nominal))
         print(L_tilde)
         print(L_obs[k])
         print(1 + (3*(L_std/L_nominal)))
@@ -193,7 +193,8 @@ for k in range(T-1):
 
 
 
-    if (mag_trigger or rate_trigger or rank_trigger) and certified is True:
+    #if (mag_trigger or rate_trigger or rank_trigger) and certified is True:
+    if (mag_trigger or rank_trigger) and certified is True:
         probe = True
         probing[k] = 1.0
         c_eff = c_nom
@@ -221,7 +222,7 @@ for k in range(T-1):
     beta_eq = 2.0
     k_beta = 0.08
 
-    beta_next = beta + (e*u[k,1] - k_beta*(beta - beta_eq))
+    beta_next = beta_measured + (e*u[k,1] - k_beta*(beta_measured - beta_eq))
     
     if warmup is True or certified is False:
         gamma_dot = 0.0
