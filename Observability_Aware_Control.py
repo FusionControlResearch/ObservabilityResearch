@@ -147,7 +147,6 @@ for k in range(T-1):
         L_ref = np.mean(L_obs[:T_warmup])
         L_std = np.std(L_obs[:T_warmup])
         L_high = L_ref + n_sigma * L_std
-        #L_high = 1.0 + (3*(L_std/L_nominal))
         #L_low  = L_ref + m_sigma * L_std
 
     if warmup is False:
@@ -165,6 +164,7 @@ for k in range(T-1):
                 dL_std = np.std(dL_nominal)
                 rho_mean   = np.mean(rho_buffer)
                 rho_std    = np.std(rho_buffer)
+                #L_high = 1.0 + (3*(L_std/L_nominal))
 
 
     if certified is True:
@@ -188,8 +188,8 @@ for k in range(T-1):
         sigma_healthy = np.std(L_obs[healthy_idx])
         L_high_nom = mu_healthy + n_sigma * sigma_healthy
     
-    if k >= 60:
-        L_obs_nom[k] = (L_obs[k] - mu_healthy) / sigma_healthy
+    #if k >= 60:
+    #    L_obs_nom[k] = (L_obs[k] - mu_healthy) / sigma_healthy
 
 
 
@@ -210,12 +210,12 @@ for k in range(T-1):
         probe_amp = 1.0
         z = z - z / tau
 
-    #probe = False
-    #u[k, 1] = 0.0
-    #u_k = 1.0
-    #probe_amp = 1.0
-    #z = z - z / tau
-    #probing[k] = 0.0
+    '''probe = False
+    u[k, 1] = 0.0
+    u_k = 1.0
+    probe_amp = 1.0
+    z = z - z / tau
+    probing[k] = 0.0'''
 
     Ip_next = Ip + (a*u[k,1] - 0.12*Ip)
     li_next = li + (c_eff*u[k,1] - d*li)
@@ -257,7 +257,7 @@ with open('L_obs_data_no_probe.csv', 'w', newline='') as myfile:
     for i in range(len(t)):
         writer.writerow([t[i], L_obs[i]]) # Write data rows
 
-plt.figure()
+'''plt.figure()
 plt.plot(t, L_obs_nom)
 plt.ylabel("Nominal Observability loss L_obs_nom")
 plt.xlabel("time")
@@ -269,7 +269,7 @@ with open('L_obs_nom_data_no_probe.csv', 'w', newline='') as myfile:
     writer = csv.writer(myfile)
     writer.writerow(['x_value', 'y_value']) # Write header
     for i in range(len(t)):
-        writer.writerow([t[i], L_obs_nom[i]]) # Write data rows
+        writer.writerow([t[i], L_obs_nom[i]]) # Write data rows'''
 
 plt.figure()
 plt.plot(t, probing)
