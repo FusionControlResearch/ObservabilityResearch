@@ -91,8 +91,7 @@ T_warmup = 50  # timesteps
 warmup = True
 certified = False
 
-n_sigma = 3.1
-
+n_sigma = 2
 
 for k in range(T-1):
 
@@ -171,10 +170,7 @@ for k in range(T-1):
         L_tilde_prev = L_tilde
         L_tilde = L_obs[k] / L_nominal
         dL = (L_tilde - L_tilde_prev) / (k - (k-1))
-        mag_trigger = L_tilde > 1.0 + (3*(L_std/L_nominal))
-        print(L_tilde)
-        print(L_obs[k])
-        print(1 + (3*(L_std/L_nominal)))
+        mag_trigger = L_tilde > 1.0 + (n_sigma*(L_std/L_nominal))
         rate_trigger = abs(dL) > 3*dL_std
         s = np.linalg.svd(G_eff, compute_uv=False)
         rho = s[-1] / s[0]
@@ -218,6 +214,7 @@ for k in range(T-1):
     probing[k] = 0.0'''
 
     Ip_next = Ip + (a*u[k,1] - 0.12*Ip)
+    print(Ip_next)
     li_next = li + (c_eff*u[k,1] - d*li)
     beta_eq = 2.0
     k_beta = 0.08
@@ -233,11 +230,12 @@ for k in range(T-1):
         obs_integrator_next = obs_integrator + max(0, L_obs[k] - L_nominal)
         x[k+1] = [Ip_next, li_next, beta_next, gamma_next, gamma_dot, obs_integrator_next]
     
-
+    
 
 # Final observability
 G_final = compute_G(x[-1,0], x[-1,1], x[-1,2], c_nom)
 L_obs[-1] = np.log(np.linalg.cond(G_final.T @ G_final))
+print(np.mean(L_obs))
 
 
 
@@ -249,9 +247,19 @@ plt.ylabel("Observability loss L_obs")
 plt.xlabel("time")
 plt.title("Observability collapse and recovery")
 plt.axhline(y=L_high, color='green', linestyle='-')
+plt.fill_between(
+    range(len(probing)),
+    max(L_obs),
+    min(L_obs),
+    where=probing > 0,
+    alpha=0.2,
+    label="Probing active"
+)
+plt.legend
 plt.show()
 
-with open('L_obs_data_no_probe.csv', 'w', newline='') as myfile:
+#with open('L_obs_data_probe.csv', 'w', newline='') as myfile:
+with open('L_obs_nom_sigma4.csv', 'w', newline='') as myfile:
     writer = csv.writer(myfile)
     writer.writerow(['x_value', 'y_value']) # Write header
     for i in range(len(t)):
@@ -278,7 +286,7 @@ plt.xlabel("time")
 plt.title("Supervisor-triggered probing")
 plt.show()
 
-with open('probe_off_data.csv', 'w', newline='') as myfile:
+with open('probe_on_data.csv', 'w', newline='') as myfile:
     writer = csv.writer(myfile)
     writer.writerow(['x_value', 'y_value']) # Write header
     for i in range(len(t)):
@@ -318,3 +326,74 @@ plt.ylabel("Observability loss L_obs")
 plt.title("Observability metric sensitivity to diagnostic degradation")
 plt.gca().invert_xaxis()
 plt.show()
+
+
+
+#--------------------------------------------------------------------------------------------
+
+'''x[:,0] = Ip
+x[:,1] = li
+x[:,2] = beta
+
+plt.figure()
+
+plt.plot(
+    x_no_probe[:,0],
+    x_no_probe[:,2],
+    label="No probing",
+    linewidth=2
+)
+
+plt.plot(
+    x_probe[:,0],
+    x_probe[:,2],
+    label="Observability probing",
+    linewidth=2
+)
+
+plt.xlabel("Plasma current (Ip)")
+plt.ylabel("Plasma beta")
+
+plt.title("State-space trajectory under observability degradation")
+
+plt.legend()
+
+plt.show()
+
+
+#---------------------------------------------------------------------------------------------
+
+probe_indices = np.where(probe_hist == 1)[0]
+
+plt.scatter(
+    x_probe[probe_indices,0],
+    x_probe[probe_indices,2],
+    s=20,
+    label="Probing active"
+)
+
+#-----------------------------------------------------------------------------------------------
+
+plt.scatter(
+    x_probe[:,0],
+    x_probe[:,2],
+    c=L_probe,
+    cmap="viridis",
+    s=10
+)
+
+plt.colorbar(label="Observability loss L_obs")
+
+
+Figure X shows the state-space trajectory of the simulated plasma dynamics in the 
+(
+𝐼
+𝑝
+,
+𝛽
+)
+(I
+p
+	​
+
+,β) plane. In the absence of probing, the system drifts toward regions associated with elevated observability loss. When the proposed observability probing mechanism is enabled, small excitation inputs alter the trajectory, preventing prolonged residence in poorly observable regions. Points where probing is active are highlighted. This visualization illustrates the geometric mechanism by which the proposed supervisory layer restores system observability.'''
