@@ -12,6 +12,8 @@ t = np.arange(T)
 # State: [Ip, li, beta, gamma]
 x = np.zeros((T, 6))
 x[0] = [10.0, 1.0, 2.0, 0.1, 0.0, 0.0]
+Ip_0 = 10.0
+li_0 = 1.0
 
 dt = 1.0
 
@@ -64,8 +66,8 @@ correction = False
 def compute_G(Ip, li, beta, c_eff):
     return np.array([
         [alpha1*a + alpha2*c_eff,   -alpha2*d],
-        [alpha3*beta*a,             alpha3*e*Ip],
-        [alpha4*beta*a,                       alpha4*f*li]
+        [alpha3*beta*a,             alpha3*e*(Ip - Ip_0)],
+        [alpha4*beta*a,                       alpha4*f*(li - li_0)]
     ])
 
 
@@ -98,7 +100,7 @@ for k in range(T-1):
     Ip, li, beta, gamma, gamma_dot, obs_integrator = x[k]
 
     # Degradation window
-    degraded = (80 < k < 120)
+    degraded = (60 < k < 120)
 
     # Loss of actuator coupling
     if degraded:
@@ -108,7 +110,7 @@ for k in range(T-1):
 
     # Pressure erosion
     if degraded:
-        beta_measured = beta * 0.1
+        beta_measured = beta * 0.6
     else:
         beta_measured = beta
 
@@ -190,7 +192,7 @@ for k in range(T-1):
 
 
     #if (mag_trigger or rate_trigger or rank_trigger) and certified is True:
-    if (mag_trigger or rank_trigger) and certified is True:
+    '''if (mag_trigger or rank_trigger) and certified is True:
         probe = True
         probing[k] = 1.0
         c_eff = c_nom
@@ -204,18 +206,19 @@ for k in range(T-1):
         u[k, 1] = 0.0
         u_k = 1.0
         probe_amp = 1.0
-        z = z - z / tau
+        z = z - z / tau'''
 
-    '''probe = False
+    probe = False
     u[k, 1] = 0.0
     u_k = 1.0
     probe_amp = 1.0
     z = z - z / tau
-    probing[k] = 0.0'''
+    probing[k] = 0.0
 
-    Ip_next = Ip + (a*u[k,1] - 0.12*Ip)
-    print(Ip_next)
-    li_next = li + (c_eff*u[k,1] - d*li)
+    Ip_next = Ip + (a*u[k,1] - 0.12*(Ip-10.0))
+    li_next = li + (c_eff*u[k,1] - d*(li-1.0))
+    #Ip_next = Ip + (a*u[k,1] - 0.12*(Ip))
+    #li_next = li + (c_eff*u[k,1] - d*(li))
     beta_eq = 2.0
     k_beta = 0.08
 
