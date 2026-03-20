@@ -66,8 +66,8 @@ correction = False
 def compute_G(Ip, li, beta, c_eff):
     return np.array([
         [alpha1*a + alpha2*c_eff,   -alpha2*d],
-        [alpha3*beta*a,             alpha3*e*(Ip - Ip_0)],
-        [alpha4*beta*a,                       alpha4*f*(li - li_0)]
+        [alpha3*beta*a,             alpha3*e*(Ip-Ip_0)],
+        [alpha4*beta*a,                       alpha4*f*(li-li_0)]
     ])
 
 
@@ -100,7 +100,7 @@ for k in range(T-1):
     Ip, li, beta, gamma, gamma_dot, obs_integrator = x[k]
 
     # Degradation window
-    degraded = (60 < k < 120)
+    degraded = (80 < k < 120)
 
     # Loss of actuator coupling
     if degraded:
@@ -110,7 +110,7 @@ for k in range(T-1):
 
     # Pressure erosion
     if degraded:
-        beta_measured = beta * 0.6
+        beta_measured = beta * 0.9
     else:
         beta_measured = beta
 
@@ -118,6 +118,7 @@ for k in range(T-1):
     # Observability metric
     G_eff = compute_G(Ip, li, beta_measured, c_eff)
     L_obs[k] = np.log(1 + np.linalg.cond(G_eff))
+    print(np.linalg.cond(G_eff))
 
 
     # --- ESTIMATOR CONFIDENCE UPDATE (Layer B) ---
@@ -173,10 +174,10 @@ for k in range(T-1):
         L_tilde = L_obs[k] / L_nominal
         dL = (L_tilde - L_tilde_prev) / (k - (k-1))
         mag_trigger = L_tilde > 1.0 + (n_sigma*(L_std/L_nominal))
-        rate_trigger = abs(dL) > 3*dL_std
+        rate_trigger = abs(dL) > n_sigma*dL_std
         s = np.linalg.svd(G_eff, compute_uv=False)
         rho = s[-1] / s[0]
-        rank_trigger = rho < (rho_mean - 3*rho_std)
+        rank_trigger = rho < (rho_mean - n_sigma*rho_std)
 
     
     if k == 60:
@@ -192,7 +193,8 @@ for k in range(T-1):
 
 
     #if (mag_trigger or rate_trigger or rank_trigger) and certified is True:
-    '''if (mag_trigger or rank_trigger) and certified is True:
+    #if (mag_trigger or rank_trigger) and certified is True:
+    if (mag_trigger) and certified is True:
         probe = True
         probing[k] = 1.0
         c_eff = c_nom
@@ -206,14 +208,14 @@ for k in range(T-1):
         u[k, 1] = 0.0
         u_k = 1.0
         probe_amp = 1.0
-        z = z - z / tau'''
+        z = z - z / tau
 
-    probe = False
+    '''probe = False
     u[k, 1] = 0.0
     u_k = 1.0
     probe_amp = 1.0
     z = z - z / tau
-    probing[k] = 0.0
+    probing[k] = 0.0'''
 
     Ip_next = Ip + (a*u[k,1] - 0.12*(Ip-10.0))
     li_next = li + (c_eff*u[k,1] - d*(li-1.0))
@@ -241,6 +243,15 @@ L_obs[-1] = np.log(np.linalg.cond(G_final.T @ G_final))
 print(np.mean(L_obs))
 
 
+# Plots
+plt.figure()
+plt.plot(x[:,0], x[:,2])
+plt.ylabel("Sensor Quality (Beta)")
+plt.xlabel("Plasma Current")
+plt.title("Plasma Current vs Sensor Quality")
+plt.legend
+plt.show()
+
 
 
 # Plots
@@ -250,37 +261,16 @@ plt.ylabel("Observability loss L_obs")
 plt.xlabel("time")
 plt.title("Observability collapse and recovery")
 plt.axhline(y=L_high, color='green', linestyle='-')
-plt.fill_between(
-    range(len(probing)),
-    max(L_obs),
-    min(L_obs),
-    where=probing > 0,
-    alpha=0.2,
-    label="Probing active"
-)
 plt.legend
 plt.show()
 
-#with open('L_obs_data_probe.csv', 'w', newline='') as myfile:
-with open('L_obs_nom_sigma4.csv', 'w', newline='') as myfile:
+with open('L_obs_data_no_probe.csv', 'w', newline='') as myfile:
     writer = csv.writer(myfile)
     writer.writerow(['x_value', 'y_value']) # Write header
     for i in range(len(t)):
         writer.writerow([t[i], L_obs[i]]) # Write data rows
 
-'''plt.figure()
-plt.plot(t, L_obs_nom)
-plt.ylabel("Nominal Observability loss L_obs_nom")
-plt.xlabel("time")
-plt.title("Nominal Observability collapse and recovery")
-plt.axhline(y=L_high_nom, color='green', linestyle='-')
-plt.show()
 
-with open('L_obs_nom_data_no_probe.csv', 'w', newline='') as myfile:
-    writer = csv.writer(myfile)
-    writer.writerow(['x_value', 'y_value']) # Write header
-    for i in range(len(t)):
-        writer.writerow([t[i], L_obs_nom[i]]) # Write data rows'''
 
 plt.figure()
 plt.plot(t, probing)
@@ -289,7 +279,7 @@ plt.xlabel("time")
 plt.title("Supervisor-triggered probing")
 plt.show()
 
-with open('probe_on_data.csv', 'w', newline='') as myfile:
+with open('probe_off_data.csv', 'w', newline='') as myfile:
     writer = csv.writer(myfile)
     writer.writerow(['x_value', 'y_value']) # Write header
     for i in range(len(t)):
